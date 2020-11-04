@@ -40,6 +40,7 @@ namespace Lab1
             }
             lastProcessId++;
             var process = new Process(lastProcessId, processSegment);
+            processes.Add(process);
         }
 
         private void RemoveProcess(int processId)
