@@ -23,5 +23,10 @@ namespace Lab1
             Id = id;
             MemorySegment = memorySegment;
         }
+
+        public void Relocate(int startAddress, int endAddress)
+        {
+            MemorySegment = new MemorySegment(startAddress, endAddress, MemorySegmentType.Process);
+        }
     }
 }
