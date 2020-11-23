@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Lab1
 {
-    class CommandGenerator
+    public class CommandGenerator
     {
         public int CommandsNumber
         {
@@ -35,6 +35,23 @@ namespace Lab1
             get;
             set;
         }
+        public Tuple<int, int> BPLiveTimeRange
+        {
+            get;
+            set;
+        }
+
+        public Tuple<int, int> BPMemoryRequiredRange
+        {
+            get;
+            set;
+        }
+
+        public int PercentageOfBackgroundProcess
+        {
+            get;
+            set;
+        }
 
         private int GetGaussianDistributedNumber(Random rand, Tuple<int, int> range)
         {
@@ -47,12 +64,25 @@ namespace Lab1
 
         public void GenerateCommands()
         {
+            Commands = new List<Command>();
             var rand = new Random();
             for (int i = 0; i < CommandsNumber; ++i)
-                Commands.Add(new Command(
-                    rand.Next(CreationTimeRange.Item1, CreationTimeRange.Item2),
-                    GetGaussianDistributedNumber(rand, LiveTimeRange),
-                    GetGaussianDistributedNumber(rand, MemoryRequiredRange)));
+            {
+                if (rand.Next(1, 100) > PercentageOfBackgroundProcess)
+                {
+                    Commands.Add(new Command(
+                         rand.Next(CreationTimeRange.Item1, CreationTimeRange.Item2),
+                         GetGaussianDistributedNumber(rand, LiveTimeRange),
+                         GetGaussianDistributedNumber(rand, MemoryRequiredRange)));
+                }
+                else
+                {
+                    Commands.Add(new Command(
+                         rand.Next(CreationTimeRange.Item1, CreationTimeRange.Item2),
+                         GetGaussianDistributedNumber(rand, BPLiveTimeRange),
+                         GetGaussianDistributedNumber(rand, BPMemoryRequiredRange)));
+                }
+            }
             Commands.Sort();
         }
 
@@ -62,7 +92,7 @@ namespace Lab1
             {
                 StreamWriter sw = new StreamWriter("D:\\"+fileName);
                 foreach (var command in Commands)
-                    sw.WriteLine(command.ToString());
+                    sw.WriteLine(command.CreationTime.ToString() + " " + command.LiveTime.ToString() + " " + command.MemoryRequired.ToString());
                 sw.Close();
             }
             catch (Exception e)

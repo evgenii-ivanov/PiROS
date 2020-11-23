@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Lab1
 {
-    class Command : IComparable
+    public class Command : IComparable
     {
         public int CreationTime
         {

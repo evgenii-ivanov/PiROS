@@ -5,97 +5,39 @@ using System.Text;
 
 namespace Lab1
 {
-    public class MemoryController
+    public abstract class MemoryController
     {
-        private readonly List<MemorySegment> memory;
-        private readonly List<Process> processes;
-        private readonly Queue<int> processQueue;
-        private int _lastProcessId = 0;
-        private int lastIndex = -1;
-        private int _memorySize;
-        private Func<int, int> defaultSegmentSearchFunc;
+        protected readonly List<MemorySegment> memory;
+        
+        protected readonly Queue<Tuple<int, int>> processQueue;
+        protected int _lastProcessId = 0;
+        protected int lastIndex = -1;
+        protected int _memorySize;
 
-        public MemoryController(int memorySize, Func<int, int> segmentSearchFunc)
+        public bool IsDefragmentationDone
+        {
+            get;
+            set;
+        }
+
+        public List<Process> Processes
+        {
+            get;
+            protected set;
+        }
+
+        public MemoryController(int memorySize)
         {
             memory = new List<MemorySegment>();
-            memory.Add(new MemorySegment(0, memorySize, MemorySegmentType.Hole));
-            processes = new List<Process>();
+            memory.Add(new MemorySegment(0, memorySize - 1, MemorySegmentType.Hole));
+            Processes = new List<Process>();
             _memorySize = memorySize;
-            defaultSegmentSearchFunc = segmentSearchFunc;
+            processQueue = new Queue<Tuple<int, int>>();
         }
 
-        public int FirstFitSearch(int processSize)
-        {
-            for (int i = 0; i < memory.Count; i++)
-            {
-                var segment = memory[i];
-                if (segment.Type != MemorySegmentType.Hole)
-                    continue;
-                if (segment.EndAddress - segment.StartAddress + 1 >= processSize)
-                {
-                    return i;
-                }
-            }
-            return -1;
-        }
+        public abstract int Search(int processSize);
 
-        public int NextFitSearch(int processSize)
-        {
-            for (int i = 0; i < memory.Count; i++)
-            {
-                int index = (i + lastIndex + 1) % memory.Count;
-                var segment = memory[index];
-                if (segment.Type != MemorySegmentType.Hole)
-                    continue;
-                if (segment.EndAddress - segment.StartAddress + 1 >= processSize)
-                {
-                    lastIndex = i;
-                    return i;
-                }
-            }
-            lastIndex = -1;
-            return -1;
-        }
-
-        public int BestFitSearch(int processSize)
-        {
-            int bestSegmentIndex = -1;
-            int bestSegmentSize = _memorySize + 2;
-            for (int i = 0; i < memory.Count; i++)
-            {
-                var segment = memory[i];
-                if (segment.Type != MemorySegmentType.Hole)
-                    continue;
-                int size = segment.EndAddress - segment.StartAddress + 1;
-                if (size >= processSize && size < bestSegmentSize)
-                {
-                    bestSegmentIndex = i;
-                    bestSegmentSize = size;
-                }
-            }
-            return bestSegmentIndex;
-        }
-
-        public int WorstFitSearch(int processSize)
-        {
-            int bestSegmentIndex = -1;
-            int bestSegmentSize = 0;
-            for (int i = 0; i < memory.Count; i++)
-            {
-                var segment = memory[i];
-                if (segment.Type != MemorySegmentType.Hole)
-                    continue;
-                int size = segment.EndAddress - segment.StartAddress + 1;
-                if (size >= processSize && size > bestSegmentSize)
-                {
-                    bestSegmentIndex = i;
-                    bestSegmentSize = size;
-                }
-            }
-            return bestSegmentIndex;
-        }
-
-        public bool InsertProcess(int processSize)
+        public InsertionResult InsertProcess(int processSize)
         {
             if (processSize > _memorySize)
             {
@@ -103,25 +45,28 @@ namespace Lab1
             }
             if (!IsEnoughMemory(processSize))
             {
-                processQueue.Append(processSize);
-                return false;
+                _lastProcessId++;
+                processQueue.Enqueue(new Tuple<int, int>(_lastProcessId, processSize));
+                return new InsertionResult() { ProcessId = _lastProcessId, IsInserted = false };
             }
-            var segmentIndex = defaultSegmentSearchFunc(processSize);
+            var segmentIndex = Search(processSize);
             if (segmentIndex != -1)
             {
                 InsertProcess(segmentIndex, processSize);
-                return true;
+                _lastProcessId++;
+                return new InsertionResult() { ProcessId = _lastProcessId, IsInserted = true };
             }
-            if (segmentIndex < 0 && segmentIndex >= memory.Count)
+            if (segmentIndex < -1 && segmentIndex >= memory.Count)
             {
                 throw new Exception("Check your segment search function");
             }
-            Defragment(processSize);
+            Defragment();
             return InsertProcess(processSize);
         }
 
-        private void InsertProcess(int segmentIndex, int size)
+        private void InsertProcess(int segmentIndex, int size, int? id = null)
         {
+            id ??= _lastProcessId + 1;
             if (memory[segmentIndex].Type != MemorySegmentType.Hole)
             {
                 throw new Exception("Proccess can be inserted only into hole");
@@ -141,14 +86,13 @@ namespace Lab1
                 var holeSegment = new MemorySegment(processSegment.EndAddress + 1, endAddress, MemorySegmentType.Hole);
                 memory.Insert(segmentIndex + 1, holeSegment);
             }
-            _lastProcessId++;
-            var process = new Process(_lastProcessId, processSegment);
-            processes.Add(process);
+            var process = new Process(id.Value, processSegment);
+            Processes.Add(process);
         }
 
-        public void RemoveProcess(int processId)
+        public List<int> RemoveProcess(int processId)
         {
-            var process = processes.Find(x => x.Id == processId);
+            var process = Processes.Find(x => x.Id == processId);
             int startAddress = process.MemorySegment.StartAddress;
             int endAddress = process.MemorySegment.EndAddress;
             var segmentIndex = memory.FindIndex(x => x.StartAddress == startAddress && x.EndAddress == endAddress);
@@ -161,16 +105,37 @@ namespace Lab1
             if (segmentIndex >= 1 && memory[segmentIndex - 1].Type == MemorySegmentType.Hole)
             {
                 segmentIndex--;
-                startAddress = memory[segmentIndex ].StartAddress;
+                startAddress = memory[segmentIndex].StartAddress;
                 memory.RemoveAt(segmentIndex);
             }
             var memorySegment = new MemorySegment(startAddress, endAddress, MemorySegmentType.Hole);
             memory.Insert(segmentIndex, memorySegment);
-            processes.Remove(process);
-            while (processQueue.Any() && InsertProcess(processQueue.Peek()))
+            Processes.Remove(process);
+            var insertedIds = new List<int>();
+            while (processQueue.Any() && PassProcess(processQueue.Peek().Item1, processQueue.Peek().Item2))
             {
+                insertedIds.Add(processQueue.Peek().Item1);
                 processQueue.Dequeue();
             }
+            return insertedIds;
+        }
+
+        private bool PassProcess(int id, int processSize)
+        {
+            if (!IsEnoughMemory(processSize))
+            {
+                return false;
+            }
+            var segmentIndex = Search(processSize);
+            if (segmentIndex != -1)
+            {
+                InsertProcess(segmentIndex, processSize, id);
+                return true;
+            }
+            Defragment();
+            segmentIndex = Search(processSize);
+            InsertProcess(segmentIndex, processSize, id);
+            return true;
         }
 
         private bool IsEnoughMemory(int processSize)
@@ -179,8 +144,9 @@ namespace Lab1
             return availableMemory >= processSize;
         }
 
-        private void Defragment(int processSize)
+        private void Defragment()
         {
+            IsDefragmentationDone = true;
             int lastEmpty = -1;
             int removedProcessesNumber = 0;
             for (int i = 0; i < memory.Count; i++)
@@ -189,12 +155,12 @@ namespace Lab1
                 {
                     continue;
                 }
-                var process = processes.Find(x => x.MemorySegment.StartAddress == memory[i].StartAddress);
+                var process = Processes.Find(x => x.MemorySegment.StartAddress == memory[i].StartAddress);
                 var segmentSize = memory[i].EndAddress - memory[i].StartAddress + 1;
                 memory.RemoveAt(i);
                 var segment = new MemorySegment(lastEmpty + 1, lastEmpty + segmentSize, MemorySegmentType.Process);
                 lastEmpty += segmentSize;
-                memory.Insert(removedProcessesNumber, segment);
+                memory.Insert(removedProcessesNumber++, segment);
                 process.Relocate(segment.StartAddress, segment.EndAddress);
             }
             if (lastEmpty != _memorySize)
