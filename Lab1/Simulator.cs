@@ -12,6 +12,7 @@ namespace Lab1
 
         private SortedSet<Event> events;
         private List<string> logs;
+        private List<int> delayTime;
         private int defragmentationsNumber;
         private int queuedProcessNumber;
         private int _defragmentationTime;
@@ -23,10 +24,14 @@ namespace Lab1
             _memoryController = memoryController;
             events = new SortedSet<Event>();
             logs = new List<string>();
+            delayTime = new List<int>();
             defragmentationsNumber = 0;
             queuedProcessNumber = 0;
             _defragmentationTime = defragmentationTime;
             _outOfStatisticsCommandNumber = outOfStatisticsCommandNumber;
+
+            for (int i = 0; i < _commandGenerator.CommandsNumber; ++i)
+                delayTime.Add(0);
         }
 
         public void Run()
@@ -81,12 +86,14 @@ namespace Lab1
                             logs.Add("Time " + currentEvent.Time.ToString() + " Process removed. ProcessId = " + currentEvent.ProcessId.Value.ToString());
                             foreach (var id in removedIds)
                             {
+                                int commandId = processCommandMatching[currentEvent.ProcessId.Value];
                                 events.Add(new Event()
                                 {
                                     EventType = EventType.Removing,
-                                    Time = currentEvent.Time + _commandGenerator.Commands[processCommandMatching[currentEvent.ProcessId.Value]].LiveTime,
+                                    Time = currentEvent.Time + _commandGenerator.Commands[commandId].LiveTime,
                                     ProcessId = id
                                 });
+                                delayTime[commandId] += currentEvent.Time - _commandGenerator.Commands[commandId].CreationTime;
                                 logs.Add("Time " + currentEvent.Time.ToString() + " Queued process started. ProcessId = " + id.ToString());
                             }
                             break;
@@ -96,6 +103,13 @@ namespace Lab1
                 }
                 if(_memoryController.IsDefragmentationDone && commandProcessedNumber > _outOfStatisticsCommandNumber)
                 {
+                    foreach(var cevent in events)
+                    {
+                        if (cevent.ProcessId.HasValue)
+                            delayTime[processCommandMatching[cevent.ProcessId.Value]] += _defragmentationTime;
+                        else
+                            delayTime[cevent.CommandId] += _defragmentationTime;
+                    }
                     defragmentationsNumber++;
                     logs.Add("Time " + currentEvent.Time.ToString() + " Defragmentation was performed. Current number of defrafmentation  = " + defragmentationsNumber.ToString());
                 }
@@ -122,10 +136,27 @@ namespace Lab1
             try
             {
                 StreamWriter sw = new StreamWriter("D:\\" + statisticsFileName);
+
                 int processesNumber = _commandGenerator.CommandsNumber - _outOfStatisticsCommandNumber;
                 sw.WriteLine("Number of processes : " + processesNumber.ToString());
-                sw.WriteLine("Number of defragmentations : " + defragmentationsNumber.ToString() + " (" + (defragmentationsNumber / (double)processesNumber * 100).ToString() + "%)");
-                sw.WriteLine("Number of queud processes : " + queuedProcessNumber.ToString() + " (" + (queuedProcessNumber / (double)processesNumber * 100).ToString() + "%)");
+
+                Int64 summaryLiveTime = 0;
+                Int64 summaryDelayTime = 0;
+                for (int i = _outOfStatisticsCommandNumber; i < _commandGenerator.CommandsNumber; ++i)
+                {
+                    summaryDelayTime += delayTime[i];
+                    summaryLiveTime += _commandGenerator.Commands[i].LiveTime;
+                }
+                sw.WriteLine("Average runtime : " + ((summaryLiveTime + summaryDelayTime) / (double)processesNumber).ToString());
+
+                sw.WriteLine("Number of defragmentations : " + defragmentationsNumber.ToString() + 
+                    " (" + (defragmentationsNumber / (double)processesNumber * 100).ToString() + "%)");
+
+                sw.WriteLine("Number of queud processes : " + queuedProcessNumber.ToString() + 
+                    " (" + (queuedProcessNumber / (double)processesNumber * 100).ToString() + "%)");
+
+                sw.WriteLine("Average delay : " + (summaryDelayTime / (double)processesNumber).ToString());
+
                 sw.Close();
             }
             catch (Exception e)
