@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
 
 namespace Lab1
 {
@@ -7,33 +9,55 @@ namespace Lab1
     {
         static void Main(string[] args)
         {
+            var sr = new StreamReader("D:\\config.json");
+            var configString = sr.ReadToEnd();
+            sr.Close();
+
+            var config = JsonSerializer.Deserialize<Configuration>(configString);
+
             CommandGenerator generator = new CommandGenerator();
 
-            generator.CommandsNumber = 10000;
-            generator.CreationTimeRange = new Tuple<int, int>(1, 1000000);
-            generator.LiveTimeRange = new Tuple<int, int>(1, 10000);
-            generator.BPLiveTimeRange = new Tuple<int, int>(1, 100000);
-            generator.MemoryRequiredRange = new Tuple<int, int>(10, 2000000);
-            generator.BPMemoryRequiredRange = new Tuple<int, int>(10, 5000);
-            generator.PercentageOfBackgroundProcess = 93;
+            generator.CommandsNumber = config.CommandNumber;
+            generator.CreationTimeRange = new Tuple<int, int>(config.MinimalCreationTime, config.MaximalCreationTime);
+            generator.LiveTimeRange = new Tuple<int, int>(config.MinimalLiveTime, config.MaximalLiveTime);
+            generator.BPLiveTimeRange = new Tuple<int, int>(config.MinimalBPLiveTime, config.MaximalBPLiveTime);
+            generator.MemoryRequiredRange = new Tuple<int, int>(config.MinimalMemoryRequired, config.MaximalMemoryRequired);
+            generator.BPMemoryRequiredRange = new Tuple<int, int>(config.MinimalBPMemoryRequired, config.MaximalBPMemoryRequired);
+            generator.PercentageOfBackgroundProcess = config.PercentageOfBackgroundProcesses;
 
-            generator.GenerateCommands();
-            generator.SaveCommandsInFile();
-
-            int memorySize = 8000000;
-            int defragmentatinTime = 5;
+            if (config.GenerateNewCommands)
+            {
+                generator.GenerateCommands();
+                generator.SaveCommandsInFile();
+            }
+            else
+            {
+                generator.Commands = new List<Command>();
+                var csr = new StreamReader("D:\\commands.txt");
+                for(int i = 0; i < config.CommandNumber; ++i)
+                {
+                    var buffer = csr.ReadLine();
+                    var strings = buffer.Split(' ');
+                    generator.Commands.Add(new Command(
+                        Int32.Parse(strings[0]),
+                        Int32.Parse(strings[1]),
+                        Int32.Parse(strings[2])
+                        ));
+                }
+                csr.Close();
+            }
 
             var memoryControllers = new List<MemoryController>()
             { 
-                new FirstFitMemoryController(memorySize),
-                new NextFitMemoryController(memorySize),
-                new BestFitMemoryController(memorySize),
-                new WorstFitMemoryController(memorySize)
+                new FirstFitMemoryController(config.MemorySize),
+                new NextFitMemoryController(config.MemorySize),
+                new BestFitMemoryController(config.MemorySize),
+                new WorstFitMemoryController(config.MemorySize)
             };
 
             foreach (var memoryController in memoryControllers)
             {
-                var simulator = new Simulator(memoryController, generator, defragmentatinTime);
+                var simulator = new Simulator(memoryController, generator, config.DefragmentationTime, config.OutOfStatisticsCommandNumber);
                 simulator.Run();
                 simulator.SaveLogs(memoryController.GetType().ToString() + "Logs.txt");
                 simulator.CountStatistics(memoryController.GetType().ToString() + "Statistics.txt");

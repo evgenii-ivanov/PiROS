@@ -16,7 +16,7 @@ namespace Lab1
         public List<Command> Commands
         {
             get;
-            private set;
+            set;
         }
 
         public Tuple<int, int> CreationTimeRange

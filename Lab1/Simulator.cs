@@ -15,8 +15,9 @@ namespace Lab1
         private int defragmentationsNumber;
         private int queuedProcessNumber;
         private int _defragmentationTime;
+        private int _outOfStatisticsCommandNumber;
 
-        public Simulator(MemoryController memoryController, CommandGenerator commandGenerator, int defragmentationTime)
+        public Simulator(MemoryController memoryController, CommandGenerator commandGenerator, int defragmentationTime, int outOfStatisticsCommandNumber)
         {
             _commandGenerator = commandGenerator;
             _memoryController = memoryController;
@@ -25,6 +26,7 @@ namespace Lab1
             defragmentationsNumber = 0;
             queuedProcessNumber = 0;
             _defragmentationTime = defragmentationTime;
+            _outOfStatisticsCommandNumber = outOfStatisticsCommandNumber;
         }
 
         public void Run()
@@ -40,6 +42,8 @@ namespace Lab1
             }
 
             var processCommandMatching = new SortedList<int, int>();
+            int commandProcessedNumber = 0;
+
 
             while(events.Count > 0)
             {
@@ -50,6 +54,7 @@ namespace Lab1
                 {
                     case EventType.Insertion:
                         {
+                            commandProcessedNumber++;
                             var insertionResult = _memoryController.InsertProcess(_commandGenerator.Commands[currentEvent.CommandId].MemoryRequired);
                             processCommandMatching.Add(insertionResult.ProcessId, currentEvent.CommandId);
                             if(insertionResult.IsInserted)
@@ -64,7 +69,8 @@ namespace Lab1
                             }
                             else
                             {
-                                queuedProcessNumber++;
+                                if(commandProcessedNumber > _outOfStatisticsCommandNumber)
+                                    queuedProcessNumber++;
                                 logs.Add("Time " + currentEvent.Time.ToString() + " Process added to the queue. ProcessId = " + insertionResult.ProcessId.ToString());
                             }
                             break;
@@ -88,7 +94,7 @@ namespace Lab1
                     default:
                         break;
                 }
-                if(_memoryController.IsDefragmentationDone)
+                if(_memoryController.IsDefragmentationDone && commandProcessedNumber > _outOfStatisticsCommandNumber)
                 {
                     defragmentationsNumber++;
                     logs.Add("Time " + currentEvent.Time.ToString() + " Defragmentation was performed. Current number of defrafmentation  = " + defragmentationsNumber.ToString());
@@ -116,8 +122,8 @@ namespace Lab1
             try
             {
                 StreamWriter sw = new StreamWriter("D:\\" + statisticsFileName);
-                int processesNumber = _commandGenerator.CommandsNumber;
-                sw.WriteLine("Number of processes : " + processesNumber);
+                int processesNumber = _commandGenerator.CommandsNumber - _outOfStatisticsCommandNumber;
+                sw.WriteLine("Number of processes : " + processesNumber.ToString());
                 sw.WriteLine("Number of defragmentations : " + defragmentationsNumber.ToString() + " (" + (defragmentationsNumber / (double)processesNumber * 100).ToString() + "%)");
                 sw.WriteLine("Number of queud processes : " + queuedProcessNumber.ToString() + " (" + (queuedProcessNumber / (double)processesNumber * 100).ToString() + "%)");
                 sw.Close();

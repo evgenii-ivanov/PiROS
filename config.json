@@ -1,0 +1,18 @@
+{
+  "CommandNumber": 10000,
+  "OutOfStatisticsCommandNumber": 1000,
+  "MinimalCreationTime": 1,
+  "MaximalCreationTime": 1000000,
+  "MinimalLiveTime": 1,
+  "MaximalLiveTime": 10000,
+  "MinimalBPLiveTime": 1,
+  "MaximalBPLiveTime": 100000,
+  "MinimalMemoryRequired": 10,
+  "MaximalMemoryRequired": 2000000,
+  "MinimalBPMemoryRequired": 10,
+  "MaximalBPMemoryRequired": 5000,
+  "PercentageOfBackgroundProcesses": 93,
+  "MemorySize": 8000000,
+  "DefragmentationTime": 5,
+  "GenerateNewCommands": false
+}
