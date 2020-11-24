@@ -17,6 +17,8 @@ namespace Lab1
 
             CommandGenerator generator = new CommandGenerator();
 
+            Console.WriteLine("Configure command generator");
+
             generator.CommandsNumber = config.CommandNumber;
             generator.CreationTimeRange = new Tuple<int, int>(config.MinimalCreationTime, config.MaximalCreationTime);
             generator.LiveTimeRange = new Tuple<int, int>(config.MinimalLiveTime, config.MaximalLiveTime);
@@ -27,11 +29,14 @@ namespace Lab1
 
             if (config.GenerateNewCommands)
             {
+                Console.WriteLine("Commands generation is started");
                 generator.GenerateCommands();
                 generator.SaveCommandsInFile();
+                Console.WriteLine("Commands generation is finished");
             }
             else
             {
+                Console.WriteLine("Commands reading");
                 generator.Commands = new List<Command>();
                 var csr = new StreamReader("D:\\commands.txt");
                 for(int i = 0; i < config.CommandNumber; ++i)
@@ -45,6 +50,7 @@ namespace Lab1
                         ));
                 }
                 csr.Close();
+                Console.WriteLine("Commands are read");
             }
 
             var memoryControllers = new List<MemoryController>()
@@ -58,9 +64,15 @@ namespace Lab1
             foreach (var memoryController in memoryControllers)
             {
                 var simulator = new Simulator(memoryController, generator, config.DefragmentationTime, config.OutOfStatisticsCommandNumber);
+                Console.WriteLine($"Simulator runs {memoryController.GetType().ToString()}");
                 simulator.Run();
-                simulator.SaveLogs(memoryController.GetType().ToString() + "Logs.txt");
-                simulator.CountStatistics(memoryController.GetType().ToString() + "Statistics.txt");
+                Console.WriteLine($"{memoryController.GetType().ToString()} simulation is finished");
+                var logFileName = $"{memoryController.GetType().ToString()}Logs.txt";
+                var statisticsFileName = $"{memoryController.GetType().ToString()}Statistics.txt";
+                simulator.SaveLogs(logFileName);
+                simulator.CountStatistics(statisticsFileName);
+                Console.WriteLine($"You can find log in {logFileName}");
+                Console.WriteLine($"You can find statisitics in {statisticsFileName}");
             }
         }
     }
